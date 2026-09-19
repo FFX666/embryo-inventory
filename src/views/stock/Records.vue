@@ -60,4 +60,74 @@
       <el-pagination style="margin-top:14px;justify-content:flex-end"
         background layout="total, sizes, prev, pager, next, jumper"
         :total="total" v-model:current-page="q.page" v-model:page-size="q.pageSize"
-        :page-sizes="[15, 30, 50, 100]" @current-change
+        :page-sizes="[15, 30, 50, 100]" @current-change="load()" @size-change="load(1)" />
+    </el-card>
+  </div>
+</template>
+
+<script setup>
+import { onMounted, reactive, ref } from 'vue'
+import { ElMessage } from 'element-plus'
+import { Search, Refresh, Download } from '@element-plus/icons-vue'
+import { api } from '@/api'
+
+const loading = ref(false)
+const rows = ref([]), total = ref(0)
+const dateRange = ref([])
+const q = reactive({ type: '', keyword: '', startDate: '', endDate: '', page: 1, pageSize: 15 })
+
+const typeText = t => ({ IN: '入库', OUT: '出库', SCRAP: '报废', ADJUST: '调整' }[t] || t)
+const typeTag = t => ({ IN: 'success', OUT: 'warning', SCRAP: 'danger' }[t] || 'info')
+
+function onDateChange (v) {
+  q.startDate = v?.[0] || ''
+  q.endDate = v?.[1] || ''
+  load(1)
+}
+
+async function load (resetPage) {
+  if (resetPage === 1) q.page = 1
+  loading.value = true
+  try {
+    const res = await api.recordList({ ...q, pageSize: q.pageSize })
+    rows.value = res.rows
+    total.value = res.total
+  } catch (e) { ElMessage.error(e.message) }
+  finally { loading.value = false }
+}
+
+function reset () {
+  Object.assign(q, { type: '', keyword: '', startDate: '', endDate: '', page: 1 })
+  dateRange.value = []
+  load()
+}
+
+async function exportData () {
+  if (!rows.value.length) return ElMessage.warning('当前无可导出数据')
+  try {
+    const res = await api.exportExcel({
+      filename: `出入库流水_${new Date().toISOString().slice(0, 10)}.xlsx`,
+      sheets: [{
+        name: '出入库流水',
+        columns: [
+          { header: '类型', key: 'typeText', width: 10 },
+          { header: '物料名称', key: 'item_name', width: 30 },
+          { header: '规格', key: 'spec', width: 16 },
+          { header: '批号', key: 'batch_no', width: 16 },
+          { header: '数量', key: 'quantity', width: 12 },
+          { header: '单位', key: 'unit', width: 10 },
+          { header: '经手人', key: 'handler', width: 14 },
+          { header: '操作员', key: 'operator_name', width: 14 },
+          { header: '用途', key: 'purpose', width: 20 },
+          { header: '备注', key: 'remark', width: 20 },
+          { header: '操作时间', key: 'created_at', width: 22 }
+        ],
+        rows: rows.value.map(r => ({ ...r, typeText: typeText(r.type) }))
+      }]
+    })
+    if (!res.cancelled) ElMessage.success('导出成功：' + res.path)
+  } catch (e) { ElMessage.error(e.message) }
+}
+
+onMounted(load)
+</script>
