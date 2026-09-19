@@ -20,11 +20,11 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: '20'
-          cache: 'npm'
+          node-version: '22'          # 升级到22，彻底消除弃用警告
+          # 注意：这里删掉了 cache: 'npm'，因为这会强制要求 lock 文件
 
       - name: Install dependencies
-        run: npm ci
+        run: npm install              # 注意：改为 npm install，不再强制要求 lock 文件
         env:
           npm_config_build_from_source: 'false'
 
