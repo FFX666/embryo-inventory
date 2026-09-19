@@ -1,0 +1,49 @@
+* { box-sizing: border-box; }
+html, body, #app { height: 100%; margin: 0; }
+body {
+  font-family: -apple-system, "Microsoft YaHei", "PingFang SC", "Helvetica Neue", Arial, sans-serif;
+  background: #f4f6fa;
+  color: #1f2d3d;
+  -webkit-font-smoothing: antialiased;
+}
+
+.page-header {
+  display: flex; align-items: center; justify-content: space-between;
+  margin-bottom: 16px;
+}
+.page-title { font-size: 18px; font-weight: 600; color: #1f2d3d; }
+.page-title small { font-size: 12px; color: #8b98a9; font-weight: 400; margin-left: 8px; }
+
+.el-card { border-radius: 10px !important; border-color: #e8edf4 !important; }
+.el-card__header { border-bottom: 1px solid #f0f3f8 !important; padding: 14px 18px !important; }
+
+.el-table th.el-table__cell { background: #f7f9fc !important; color: #5a6b80; font-weight: 600; }
+
+.filter-bar {
+  display: flex; flex-wrap: wrap; gap: 10px; align-items: center;
+  padding: 14px 16px; background: #fff; border-radius: 10px; margin-bottom: 14px;
+  border: 1px solid #e8edf4;
+}
+.filter-bar .grow { flex: 1; }
+
+.stat-card {
+  border-radius: 12px; padding: 20px 22px; color: #fff; position: relative; overflow: hidden;
+  box-shadow: 0 6px 18px rgba(31, 45, 61, .08);
+}
+.stat-card .label { font-size: 13px; opacity: .86; }
+.stat-card .value { font-size: 30px; font-weight: 700; margin-top: 8px; line-height: 1; }
+.stat-card .unit { font-size: 13px; opacity: .8; margin-left: 6px; font-weight: 400; }
+.stat-card .icon {
+  position: absolute; right: 16px; top: 50%; transform: translateY(-50%);
+  font-size: 58px; opacity: .16;
+}
+.bg-blue   { background: linear-gradient(135deg, #4a8cff, #2f6bff); }
+.bg-green  { background: linear-gradient(135deg, #34c38f, #1fac77); }
+.bg-orange { background: linear-gradient(135deg, #ffb547, #fa8c16); }
+.bg-red    { background: linear-gradient(135deg, #ff7875, #f5222d); }
+.bg-purple { background: linear-gradient(135deg, #9a7bff, #7048e8); }
+
+.row-recommend { background: #f0f9ff !important; }
+.row-recommend td { background: #f0f9ff !important; }
+
+.scan-input .el-input__wrapper { box-shadow: 0 0 0 2px #4a8cff inset !important; }
