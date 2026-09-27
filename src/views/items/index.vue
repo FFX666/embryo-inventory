@@ -50,10 +50,13 @@
           <template #default="{ row }">{{ row.warn_days }} 天</template>
         </el-table-column>
         <el-table-column prop="storage_condition" label="存储条件" width="130" show-overflow-tooltip />
-        <el-table-column label="操作" width="180" fixed="right" align="center">
+        <el-table-column label="操作" width="220" fixed="right" align="center">
           <template #default="{ row }">
             <el-button link type="primary" size="small" @click="openEdit(row)">编辑</el-button>
-            <el-button v-if="store.canWrite" link type="danger" size="small" @click="remove(row)">删除</el-button>
+            <el-button v-if="store.canWrite" link type="warning" size="small"
+                       @click="remove(row, false)">删除</el-button>
+            <el-button v-if="store.isAdmin" link type="danger" size="small"
+                       @click="remove(row, true)">强制删除</el-button>
           </template>
         </el-table-column>
       </el-table>
@@ -166,11 +169,45 @@ async function submit () {
   finally { saving.value = false }
 }
 
-async function remove (row) {
-  await ElMessageBox.confirm(`确定删除物料「${row.name}」吗？`, '删除确认', { type: 'warning' })
+/** 删除：force=false 普通删除；force=true 强制删除（仅管理员） */
+async function remove (row, force) {
+  if (force) {
+    // 强制删除：二级确认
+    try {
+      await ElMessageBox.confirm(
+        `即将强制删除物料「${row.name}」。\n\n此操作会同时删除该物料的所有批次（${row.current_stock} ${row.unit}）和全部出入库流水，且不可恢复！\n\n确定要继续吗？`,
+        '危险操作确认',
+        {
+          type: 'error',
+          confirmButtonText: '确认强制删除',
+          confirmButtonClass: 'el-button--danger',
+          cancelButtonText: '取消'
+        }
+      )
+    } catch (e) { return }
+
+    // 再确认一次，避免误操作
+    try {
+      await ElMessageBox.prompt(
+        `请输入物料名称「${row.name}」以确认删除：`,
+        '二次确认',
+        {
+          type: 'warning',
+          confirmButtonText: '彻底删除',
+          confirmButtonClass: 'el-button--danger',
+          inputValidator: (v) => v === row.name || '输入的物料名称不正确'
+        }
+      )
+    } catch (e) { return }
+  } else {
+    try {
+      await ElMessageBox.confirm(`确定删除物料「${row.name}」吗？`, '删除确认', { type: 'warning' })
+    } catch (e) { return }
+  }
+
   try {
-    await api.itemDelete({ id: row.id })
-    ElMessage.success('已删除')
+    await api.itemDelete({ id: row.id, force })
+    ElMessage.success(force ? '物料及其全部批次已强制删除' : '已删除')
     load()
   } catch (e) { ElMessage.error(e.message) }
 }
