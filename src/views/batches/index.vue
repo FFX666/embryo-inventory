@@ -49,11 +49,13 @@
         </el-table-column>
         <el-table-column prop="location" label="存放位置" min-width="130" show-overflow-tooltip />
         <el-table-column prop="supplier" label="供应商" width="120" show-overflow-tooltip />
-        <el-table-column label="操作" width="180" fixed="right" align="center">
+        <el-table-column label="操作" width="240" fixed="right" align="center">
           <template #default="{ row }">
             <el-button link type="primary" size="small" @click="trace(row)">追溯</el-button>
-            <el-button v-if="store.canWrite" link type="danger" size="small"
+            <el-button v-if="store.canWrite" link type="warning" size="small"
                        :disabled="row.remaining <= 0" @click="scrap(row)">报废</el-button>
+            <el-button v-if="store.isAdmin" link type="danger" size="small"
+                       @click="removeBatch(row)">删除</el-button>
           </template>
         </el-table-column>
       </el-table>
@@ -150,6 +152,27 @@ async function scrap (row) {
   try {
     await api.batchScrap({ batchId: row.id, quantity: Number(value), remark: '人工报废' })
     ElMessage.success('报废成功')
+    load()
+  } catch (e) { ElMessage.error(e.message) }
+}
+
+async function removeBatch (row) {
+  try {
+    await ElMessageBox.confirm(
+      `确定删除批次「${row.batch_no}」（${row.item_name}，剩余 ${row.remaining} ${row.unit}）吗？\n\n⚠️ 此操作会同时删除该批次的全部出入库流水，且不可恢复！`,
+      '危险操作确认',
+      {
+        type: 'error',
+        confirmButtonText: '确认删除',
+        confirmButtonClass: 'el-button--danger',
+        dangerouslyUseHTMLString: false
+      }
+    )
+  } catch (e) { return }  // 用户取消
+
+  try {
+    await api.batchDelete({ batchId: row.id })
+    ElMessage.success('批次已删除')
     load()
   } catch (e) { ElMessage.error(e.message) }
 }
