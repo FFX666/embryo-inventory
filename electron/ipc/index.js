@@ -31,6 +31,13 @@ function log (module, action, target = '', detail = '') {
     .run(u?.id ?? null, u?.username ?? 'system', module, action, target, detail, now())
 }
 
+/* -------- 权限断言 -------- */
+function requireAdmin () {
+  const u = session.get()
+  if (!u || u.role !== 'admin') throw new Error('仅管理员可执行此操作')
+  return u
+}
+
 function registerIpc () {
   /* ============================================================
    * 一、认证 & 账号
@@ -199,13 +206,47 @@ function registerIpc () {
     return true
   })
 
-  handle('item:delete', ({ id }) => {
+  /**
+   * 删除物料
+   * - force=false（默认）：普通删除，仅在无任何批次时允许
+   * - force=true：强制删除，仅管理员，级联删除该物料的所有批次和流水
+   */
+  handle('item:delete', ({ id, force = false }) => {
     const db = getDb()
-    const row = db.prepare('SELECT name FROM items WHERE id=?').get(id)
-    const used = db.prepare('SELECT COUNT(*) c FROM batches WHERE item_id=? AND remaining>0').get(id).c
-    if (used) throw new Error('该物料仍有库存批次，无法删除，请先出库或作废')
-    db.prepare('DELETE FROM items WHERE id=?').run(id)
-    log('基础档案', '删除', '物料', row?.name || String(id))
+    const u = session.get()
+    const row = db.prepare('SELECT * FROM items WHERE id=?').get(id)
+    if (!row) throw new Error('物料不存在')
+
+    const batchCount = db.prepare('SELECT COUNT(*) c FROM batches WHERE item_id=?').get(id).c
+    const stockRemain = db.prepare('SELECT IFNULL(SUM(remaining),0) s FROM batches WHERE item_id=?').get(id).s
+
+    if (!force) {
+      // 普通删除：只允许在无任何批次时删除
+      if (batchCount > 0) {
+        throw new Error('该物料存在库存批次，无法删除。如需强行删除，请使用「强制删除」')
+      }
+    } else {
+      // 强制删除：仅管理员
+      if (!u || u.role !== 'admin') throw new Error('仅管理员可强制删除物料')
+    }
+
+    const tx = db.transaction(() => {
+      // 删除该物料所有批次的流水
+      db.prepare(`DELETE FROM stock_records WHERE batch_id IN
+        (SELECT id FROM batches WHERE item_id = ?)`).run(id)
+      // 删除该物料所有批次
+      db.prepare('DELETE FROM batches WHERE item_id = ?').run(id)
+      // 删除物料本身
+      db.prepare('DELETE FROM items WHERE id=?').run(id)
+    })
+    tx()
+
+    if (force && batchCount > 0) {
+      log('基础档案', '删除', `物料 ${row.name}`,
+        `强制删除物料「${row.name}」，同时清除 ${batchCount} 个批次（合计剩余 ${stockRemain} ${row.unit || ''}）`)
+    } else {
+      log('基础档案', '删除', '物料', row.name)
+    }
     return true
   })
 
@@ -282,11 +323,10 @@ function registerIpc () {
     return true
   })
 
-  /** 彻底删除批次（仅管理员） */
+  /** 彻底删除批次（仅管理员），级联删除该批次的全部流水 */
   handle('batch:delete', ({ batchId }) => {
+    requireAdmin()
     const db = getDb()
-    const u = session.get()
-    if (!u || u.role !== 'admin') throw new Error('仅管理员可删除库存批次')
 
     const batch = db.prepare(`
       SELECT b.*, i.name AS item_name, i.unit AS item_unit
@@ -296,24 +336,20 @@ function registerIpc () {
     if (!batch) throw new Error('批次不存在')
 
     const tx = db.transaction(() => {
-      // 删除该批次的全部出入库流水
       db.prepare('DELETE FROM stock_records WHERE batch_id = ?').run(batchId)
-      // 删除批次本身
       db.prepare('DELETE FROM batches WHERE id = ?').run(batchId)
     })
     tx()
 
-    log('库存管理', '删除',
-      `批次 ${batch.batch_no}`,
+    log('库存管理', '删除', `批次 ${batch.batch_no}`,
       `删除物料「${batch.item_name}」批次 ${batch.batch_no}（剩余 ${batch.remaining} ${batch.item_unit || ''}）`)
     return true
   })
 
   /** 清空某物料的全部库存批次（仅管理员） */
   handle('batch:clearByItem', ({ itemId }) => {
+    requireAdmin()
     const db = getDb()
-    const u = session.get()
-    if (!u || u.role !== 'admin') throw new Error('仅管理员可清空库存')
 
     const item = db.prepare('SELECT * FROM items WHERE id=?').get(itemId)
     if (!item) throw new Error('物料不存在')
@@ -332,6 +368,7 @@ function registerIpc () {
       `清空物料「${item.name}」的全部 ${count} 个库存批次`)
     return true
   })
+
   /* ============================================================
    * 五、入库
    * ============================================================ */
@@ -382,7 +419,7 @@ function registerIpc () {
   })
 
   /* ============================================================
-   * 六、出库
+   * 六、出库（FEFO 推荐）
    * ============================================================ */
   handle('stock:recommend', ({ itemId, quantity = 0 }) => {
     const db = getDb()
@@ -490,7 +527,7 @@ function registerIpc () {
   })
 
   /* ============================================================
-   * 八、工作台
+   * 八、工作台 & 预警
    * ============================================================ */
   handle('dashboard:stats', () => {
     const db = getDb()
