@@ -282,6 +282,56 @@ function registerIpc () {
     return true
   })
 
+  /** 彻底删除批次（仅管理员） */
+  handle('batch:delete', ({ batchId }) => {
+    const db = getDb()
+    const u = session.get()
+    if (!u || u.role !== 'admin') throw new Error('仅管理员可删除库存批次')
+
+    const batch = db.prepare(`
+      SELECT b.*, i.name AS item_name, i.unit AS item_unit
+      FROM batches b JOIN items i ON i.id = b.item_id
+      WHERE b.id = ?
+    `).get(batchId)
+    if (!batch) throw new Error('批次不存在')
+
+    const tx = db.transaction(() => {
+      // 删除该批次的全部出入库流水
+      db.prepare('DELETE FROM stock_records WHERE batch_id = ?').run(batchId)
+      // 删除批次本身
+      db.prepare('DELETE FROM batches WHERE id = ?').run(batchId)
+    })
+    tx()
+
+    log('库存管理', '删除',
+      `批次 ${batch.batch_no}`,
+      `删除物料「${batch.item_name}」批次 ${batch.batch_no}（剩余 ${batch.remaining} ${batch.item_unit || ''}）`)
+    return true
+  })
+
+  /** 清空某物料的全部库存批次（仅管理员） */
+  handle('batch:clearByItem', ({ itemId }) => {
+    const db = getDb()
+    const u = session.get()
+    if (!u || u.role !== 'admin') throw new Error('仅管理员可清空库存')
+
+    const item = db.prepare('SELECT * FROM items WHERE id=?').get(itemId)
+    if (!item) throw new Error('物料不存在')
+
+    const count = db.prepare('SELECT COUNT(*) c FROM batches WHERE item_id=?').get(itemId).c
+    if (count === 0) throw new Error('该物料没有库存批次')
+
+    const tx = db.transaction(() => {
+      db.prepare(`DELETE FROM stock_records WHERE batch_id IN
+        (SELECT id FROM batches WHERE item_id = ?)`).run(itemId)
+      db.prepare('DELETE FROM batches WHERE item_id = ?').run(itemId)
+    })
+    tx()
+
+    log('库存管理', '删除', `物料 ${item.name}`,
+      `清空物料「${item.name}」的全部 ${count} 个库存批次`)
+    return true
+  })
   /* ============================================================
    * 五、入库
    * ============================================================ */
