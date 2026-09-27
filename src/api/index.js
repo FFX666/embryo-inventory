@@ -30,6 +30,8 @@ export const api = {
   batchList: d => call('batch:list', d),
   batchTrace: d => call('batch:trace', d),
   batchScrap: d => call('batch:scrap', d),
+  batchDelete: d => call('batch:delete', d),
+  batchClearByItem: d => call('batch:clearByItem', d),
 
   stockIn: d => call('stock:in', d),
   stockOut: d => call('stock:out', d),
