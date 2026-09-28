@@ -1,6 +1,6 @@
 <template>
   <div v-loading="loading">
-    <!-- 统计卡片：3 列布局，可点击跳转 -->
+    <!-- 统计卡片：3 列，可点击跳转 -->
     <el-row :gutter="16">
       <el-col :span="8">
         <div class="stat-card bg-blue clickable" @click="goItems">
@@ -127,6 +127,35 @@
         </el-card>
       </el-col>
     </el-row>
+
+    <!-- 最近出入库动态 -->
+    <el-card shadow="never" style="margin-top:16px">
+      <template #header>
+        <div style="display:flex;justify-content:space-between;align-items:center">
+          <span style="font-weight:600">最近出入库动态</span>
+          <el-button link type="primary" @click="$router.push('/stock/records')">查看全部</el-button>
+        </div>
+      </template>
+      <el-table :data="stats.recentRecords" size="small" empty-text="暂无出入库记录">
+        <el-table-column label="类型" width="90" align="center">
+          <template #default="{ row }">
+            <el-tag size="small" :type="typeTag(row.type)" effect="light">{{ typeText(row.type) }}</el-tag>
+          </template>
+        </el-table-column>
+        <el-table-column prop="item_name" label="物料" min-width="180" show-overflow-tooltip />
+        <el-table-column prop="batch_no" label="批号" width="130" />
+        <el-table-column label="数量" width="110" align="right">
+          <template #default="{ row }">
+            <span :style="{ color: row.type === 'IN' ? '#34c38f' : '#f5222d' }">
+              {{ row.type === 'IN' ? '+' : '-' }}{{ row.quantity }} {{ row.item_unit || '' }}
+            </span>
+          </template>
+        </el-table-column>
+        <el-table-column prop="handler" label="经手人" width="110" />
+        <el-table-column prop="operator_name" label="操作员" width="110" />
+        <el-table-column prop="created_at" label="时间" width="170" />
+      </el-table>
+    </el-card>
   </div>
 </template>
 
@@ -142,7 +171,7 @@ const warnTab = ref('low')
 const stats = ref({
   itemCount: 0, batchCount: 0,
   counts: { lowStock: 0, expiring: 0, expired: 0 },
-  lowStock: [], expiring: [], expired: [], trend: [], categoryDist: []
+  lowStock: [], expiring: [], expired: [], recentRecords: [], trend: [], categoryDist: []
 })
 
 const maxTrend = computed(() =>
@@ -151,26 +180,18 @@ const barH = (v) => Math.round((v / maxTrend.value) * 110) || 2
 const maxCat = computed(() => Math.max(1, ...stats.value.categoryDist.map(c => c.stock)))
 const pct = (v) => Math.round((v / maxCat.value) * 100)
 
+const typeText = (t) => ({ IN: '入库', OUT: '出库', SCRAP: '报废', ADJUST: '调整' }[t] || t)
+const typeTag = (t) => ({ IN: 'success', OUT: 'warning', SCRAP: 'danger' }[t] || 'info')
+
 /* ---- 卡片点击跳转 ---- */
-function goItems () {
-  router.push('/items')
-}
-function goBatches () {
-  router.push('/batches')
-}
+function goItems () { router.push('/items') }
+function goBatches () { router.push('/batches') }
 function goWarnings () {
-  // 若三项预警全部为 0，给出提示；否则滚动到预警区并切到"低库存"标签
   const total = stats.value.counts.lowStock + stats.value.counts.expiring + stats.value.counts.expired
-  if (total === 0) {
-    ElMessage.info('当前没有预警项')
-    return
-  }
-  // 默认切到第一项非零的标签
+  if (total === 0) { ElMessage.info('当前没有预警项'); return }
   if (stats.value.counts.lowStock > 0) warnTab.value = 'low'
   else if (stats.value.counts.expiring > 0) warnTab.value = 'expiring'
   else warnTab.value = 'expired'
-
-  // 平滑滚动到预警区
   const el = document.querySelector('.el-card')
   if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' })
 }
@@ -188,10 +209,8 @@ onMounted(load)
 <style scoped>
 /* ---- 统计卡片 ---- */
 .stat-card {
-  position: relative;
-  overflow: hidden;
-  border-radius: 12px;
-  padding: 22px 24px;
+  position: relative; overflow: hidden;
+  border-radius: 12px; padding: 22px 24px;
   color: #fff;
   box-shadow: 0 6px 18px rgba(31, 45, 61, .08);
   transition: transform .18s ease, box-shadow .18s ease;
