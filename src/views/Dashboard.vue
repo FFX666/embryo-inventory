@@ -7,7 +7,6 @@
           <div class="label">在册物料</div>
           <div class="value">{{ stats.itemCount }}<span class="unit">种</span></div>
           <el-icon class="icon"><Box /></el-icon>
-          <div class="hover-tip">点击查看物料档案 →</div>
         </div>
       </el-col>
       <el-col :span="8">
@@ -15,7 +14,6 @@
           <div class="label">有效批次</div>
           <div class="value">{{ stats.batchCount }}<span class="unit">批</span></div>
           <el-icon class="icon"><Files /></el-icon>
-          <div class="hover-tip">点击查看批次库存 →</div>
         </div>
       </el-col>
       <el-col :span="8">
@@ -26,7 +24,6 @@
             <span class="unit">项</span>
           </div>
           <el-icon class="icon"><Warning /></el-icon>
-          <div class="hover-tip">点击查看预警详情 →</div>
         </div>
       </el-col>
     </el-row>
@@ -227,11 +224,6 @@ onMounted(load)
   position: absolute; right: 18px; top: 50%; transform: translateY(-50%);
   font-size: 64px; opacity: .18;
 }
-.stat-card .hover-tip {
-  position: absolute; left: 24px; bottom: 10px;
-  font-size: 11px; opacity: 0; transition: opacity .18s ease;
-}
-.stat-card.clickable:hover .hover-tip { opacity: .8; }
 
 .bg-blue   { background: linear-gradient(135deg, #4a8cff, #2f6bff); }
 .bg-green  { background: linear-gradient(135deg, #34c38f, #1fac77); }
