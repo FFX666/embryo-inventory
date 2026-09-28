@@ -31,7 +31,7 @@
   },
   "build": {
     "appId": "com.embryolab.inventory",
-    "productName": "EmbryoInventory",
+    "productName": "EmbryoInventory1.0",
     "directories": {
       "output": "release",
       "buildResources": "build"
@@ -49,7 +49,6 @@
         { "target": "nsis", "arch": ["x64"] },
         { "target": "portable", "arch": ["x64"] }
       ],
-      "icon": "build/icon.ico",
       "artifactName": "${productName}-Setup-${version}.${ext}"
     },
     "nsis": {
@@ -58,7 +57,7 @@
       "allowToChangeInstallationDirectory": true,
       "createDesktopShortcut": true,
       "createStartMenuShortcut": true,
-      "shortcutName": "胚胎实验室库存管理"
+      "shortcutName": "EmbryoInventory1.0"
     },
     "portable": {
       "artifactName": "${productName}-Portable-${version}.${ext}"
