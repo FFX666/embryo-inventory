@@ -1,6 +1,6 @@
 {
   "name": "embryo-inventory",
-  "version": "1.0",
+  "version": "1.0.0",
   "description": "胚胎实验室库存管理系统",
   "author": "Embryo Lab",
   "main": "electron/main.js",
