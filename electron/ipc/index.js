@@ -142,10 +142,10 @@ function registerIpc () {
    * ============================================================ */
   const ITEM_BASE = `
     FROM items i
-    LEFT JOIN categories c ON c.id = i.category_id
+    LEFT JOIN categories cat ON cat.id = i.category_id
     LEFT JOIN (
       SELECT item_id, SUM(remaining) AS stock FROM batches WHERE remaining > 0 GROUP BY item_id
-    ) b ON b.item_id = i.id
+    ) bt ON bt.item_id = i.id
   `
 
   handle('item:list', ({ keyword = '', categoryId = null, status = null, page = 1, pageSize = 10 } = {}) => {
@@ -156,13 +156,15 @@ function registerIpc () {
       const kw = `%${keyword}%`
       params.push(kw, kw, kw, kw)
     }
-    if (categoryId) { where.push('i.category_id=?'); params.push(categoryId) }
-    if (status !== null && status !== '') { where.push('i.status=?'); params.push(status) }
+    if (categoryId) { where.push('i.category_id = ?'); params.push(categoryId) }
+    if (status !== null && status !== '' && status !== undefined) {
+      where.push('i.status = ?'); params.push(status)
+    }
 
     const whereSql = `WHERE ${where.join(' AND ')}`
-    const total = db.prepare(`SELECT COUNT(*) c ${ITEM_BASE} ${whereSql}`).get(...params).c
+    const total = db.prepare(`SELECT COUNT(*) AS cnt ${ITEM_BASE} ${whereSql}`).get(...params).cnt
     const rows = db.prepare(`
-      SELECT i.*, c.name AS category_name, IFNULL(b.stock,0) AS current_stock
+      SELECT i.*, cat.name AS category_name, IFNULL(bt.stock, 0) AS current_stock
       ${ITEM_BASE} ${whereSql}
       ORDER BY i.id DESC LIMIT ? OFFSET ?
     `).all(...params, pageSize, (page - 1) * pageSize)
@@ -221,22 +223,17 @@ function registerIpc () {
     const stockRemain = db.prepare('SELECT IFNULL(SUM(remaining),0) s FROM batches WHERE item_id=?').get(id).s
 
     if (!force) {
-      // 普通删除：只允许在无任何批次时删除
       if (batchCount > 0) {
         throw new Error('该物料存在库存批次，无法删除。如需强行删除，请使用「强制删除」')
       }
     } else {
-      // 强制删除：仅管理员
       if (!u || u.role !== 'admin') throw new Error('仅管理员可强制删除物料')
     }
 
     const tx = db.transaction(() => {
-      // 删除该物料所有批次的流水
       db.prepare(`DELETE FROM stock_records WHERE batch_id IN
         (SELECT id FROM batches WHERE item_id = ?)`).run(id)
-      // 删除该物料所有批次
       db.prepare('DELETE FROM batches WHERE item_id = ?').run(id)
-      // 删除物料本身
       db.prepare('DELETE FROM items WHERE id=?').run(id)
     })
     tx()
@@ -593,12 +590,12 @@ function registerIpc () {
     }
 
     const categoryDist = db.prepare(`
-      SELECT IFNULL(c.name,'未分类') name, COUNT(DISTINCT i.id) itemCount,
+      SELECT IFNULL(cat.name,'未分类') name, COUNT(DISTINCT i.id) itemCount,
              IFNULL(SUM(b.remaining),0) stock
       FROM items i
-      LEFT JOIN categories c ON c.id = i.category_id
+      LEFT JOIN categories cat ON cat.id = i.category_id
       LEFT JOIN batches b ON b.item_id = i.id AND b.remaining > 0
-      GROUP BY c.id ORDER BY stock DESC
+      GROUP BY cat.id ORDER BY stock DESC
     `).all()
 
     return {
