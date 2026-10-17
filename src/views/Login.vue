@@ -122,3 +122,21 @@ async function submit () {
 .demo { margin-top: auto; display: flex; flex-wrap: wrap; gap: 6px; align-items: center; font-size: 12px; color: #8b98a9; }
 .demo .el-tag { cursor: pointer; }
 </style>
+<div style="position: absolute; bottom: 20px; right: 20px; z-index: 999;">
+  <el-button link type="info" @click="configIp">服务器配置</el-button>
+</div>
+
+<script setup>
+// ... 其他代码
+const configIp = async () => {
+  const { value } = await ElMessageBox.prompt('请输入主机的局域网 IP', '网络配置', {
+    inputValue: localStorage.getItem('server_ip') || '192.168.1.100',
+    inputPattern: /^(\d{1,3}\.){3}\d{1,3}$/,
+    inputErrorMessage: 'IP 格式不正确'
+  })
+  if (value) {
+    localStorage.setItem('server_ip', value)
+    ElMessage.success('配置已保存')
+  }
+}
+</script>
