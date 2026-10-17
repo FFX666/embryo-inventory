@@ -4,6 +4,7 @@
     <div class="bg-deco d2"></div>
 
     <div class="login-card">
+      <!-- 左侧宣传区 -->
       <div class="left">
         <el-icon class="logo"><ColdDrink /></el-icon>
         <h1>胚胎实验室</h1>
@@ -13,10 +14,11 @@
           <li>试剂耗材全生命周期管理</li>
           <li>批次效期自动预警提醒</li>
           <li>先进先出 / 先到期先出出库</li>
-          <li>完整追溯与操作留痕</li>
+          <li>多终端协同与局域网数据共享</li>
         </ul>
       </div>
 
+      <!-- 右侧登录区 -->
       <div class="right">
         <h3>账号登录</h3>
         <p class="tip">请使用实验室分配的账号登录系统</p>
@@ -32,7 +34,7 @@
               <template #prefix><el-icon><Lock /></el-icon></template>
             </el-input>
           </el-form-item>
-          <el-button type="primary" size="large" style="width:100%" :loading="loading" @click="submit">
+          <el-button type="primary" size="large" style="width:100%; margin-top: 10px;" :loading="loading" @click="submit">
             登 录
           </el-button>
         </el-form>
@@ -43,6 +45,12 @@
           <el-tag size="small" type="success" @click="fill('operator', '123456')">operator / 123456</el-tag>
           <el-tag size="small" type="info" @click="fill('viewer', '123456')">viewer / 123456</el-tag>
         </div>
+
+        <!-- 服务器配置入口 -->
+        <div class="server-config" @click="configIp">
+          <el-icon><Setting /></el-icon>
+          <span>服务器配置 (当前: {{ currentIp || '默认' }})</span>
+        </div>
       </div>
     </div>
   </div>
@@ -51,13 +59,14 @@
 <script setup>
 import { reactive, ref } from 'vue'
 import { useRouter } from 'vue-router'
-import { ElMessage } from 'element-plus'
+import { ElMessage, ElMessageBox } from 'element-plus'
 import { useUserStore } from '@/store/user'
 
 const router = useRouter()
 const store = useUserStore()
 const formRef = ref()
 const loading = ref(false)
+const currentIp = ref(localStorage.getItem('server_ip') || '')
 
 const form = reactive({ username: 'admin', password: 'admin123' })
 const rules = {
@@ -65,7 +74,34 @@ const rules = {
   password: [{ required: true, message: '请输入密码', trigger: 'blur' }]
 }
 
-function fill (u, p) { form.username = u; form.password = p }
+function fill (u, p) {
+  form.username = u
+  form.password = p
+}
+
+/** 配置服务器 IP */
+async function configIp () {
+  try {
+    const { value } = await ElMessageBox.prompt(
+      '请输入主机的局域网 IP 地址（如果部署在单机，请填 127.0.0.1）',
+      '服务器配置',
+      {
+        confirmButtonText: '保存',
+        cancelButtonText: '取消',
+        inputValue: currentIp.value || '192.168.1.100',
+        inputPattern: /^(\d{1,3}\.){3}\d{1,3}$|^localhost$|^127\.0\.0\.1$/,
+        inputErrorMessage: 'IP 格式不正确'
+      }
+    )
+    if (value) {
+      localStorage.setItem('server_ip', value)
+      currentIp.value = value
+      ElMessage.success('服务器地址已保存，请重新登录')
+    }
+  } catch (e) {
+    // 用户取消输入
+  }
+}
 
 async function submit () {
   await formRef.value.validate()
@@ -75,7 +111,12 @@ async function submit () {
     ElMessage.success(`欢迎回来，${store.displayName}`)
     router.replace('/dashboard')
   } catch (e) {
-    ElMessage.error(e.message)
+    // 如果是网络错误，给出更明确的提示
+    if (e.message.includes('Network Error') || e.message.includes('无法连接')) {
+      ElMessage.error('无法连接服务器，请点击右下角检查“服务器配置”的 IP 是否正确')
+    } else {
+      ElMessage.error(e.message)
+    }
   } finally {
     loading.value = false
   }
@@ -116,27 +157,26 @@ async function submit () {
   width: 6px; height: 6px; border-radius: 50%; background: #8fd0ff;
 }
 
-.right { flex: 1; padding: 58px 52px; display: flex; flex-direction: column; }
+.right { flex: 1; padding: 58px 52px; display: flex; flex-direction: column; position: relative; }
 .right h3 { margin: 0 0 6px; font-size: 22px; color: #1f2d3d; }
 .right .tip { margin: 0 0 30px; font-size: 13px; color: #8b98a9; }
 .demo { margin-top: auto; display: flex; flex-wrap: wrap; gap: 6px; align-items: center; font-size: 12px; color: #8b98a9; }
 .demo .el-tag { cursor: pointer; }
-</style>
-<div style="position: absolute; bottom: 20px; right: 20px; z-index: 999;">
-  <el-button link type="info" @click="configIp">服务器配置</el-button>
-</div>
 
-<script setup>
-// ... 其他代码
-const configIp = async () => {
-  const { value } = await ElMessageBox.prompt('请输入主机的局域网 IP', '网络配置', {
-    inputValue: localStorage.getItem('server_ip') || '192.168.1.100',
-    inputPattern: /^(\d{1,3}\.){3}\d{1,3}$/,
-    inputErrorMessage: 'IP 格式不正确'
-  })
-  if (value) {
-    localStorage.setItem('server_ip', value)
-    ElMessage.success('配置已保存')
-  }
+/* 服务器配置入口 */
+.server-config {
+  position: absolute;
+  bottom: 20px;
+  right: 20px;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 12px;
+  color: #97a3b5;
+  cursor: pointer;
+  transition: color 0.2s;
 }
-</script>
+.server-config:hover {
+  color: #409eff;
+}
+</style>
