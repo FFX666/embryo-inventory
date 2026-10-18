@@ -1,7 +1,5 @@
 const { app, BrowserWindow, shell } = require('electron')
 const path = require('path')
-const { initDatabase } = require('./db')
-const { registerIpc } = require('./ipc')
 
 const isDev = !app.isPackaged
 let win = null
@@ -37,8 +35,7 @@ function createWindow () {
 }
 
 app.whenReady().then(() => {
-  initDatabase()
-  registerIpc()
+  // 去掉了 initDatabase() 和 registerIpc()
   createWindow()
 
   app.on('activate', () => {

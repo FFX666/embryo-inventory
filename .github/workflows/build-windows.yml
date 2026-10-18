@@ -27,11 +27,6 @@ jobs:
         env:
           npm_config_build_from_source: 'false'
 
-      - name: Rebuild native modules for Electron
-        run: npx electron-builder install-app-deps
-        env:
-          npm_config_registry: https://registry.npmmirror.com
-
       # ✅ 从 tag 提取版本号，写入 package.json
       - name: Set version from tag
         shell: bash
@@ -53,7 +48,6 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           ELECTRON_MIRROR: https://npmmirror.com/mirrors/electron/
-          ELECTRON_BUILDER_BINARIES_MIRROR: https://npmmirror.com/mirrors/electron-builder-binaries/
 
       - name: Upload artifacts
         uses: actions/upload-artifact@v4
