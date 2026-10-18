@@ -88,7 +88,7 @@ async function configIp () {
       {
         confirmButtonText: '保存',
         cancelButtonText: '取消',
-        inputValue: currentIp.value || '192.168.1.100',
+        inputValue: currentIp.value || '172.16.18.20',
         inputPattern: /^(\d{1,3}\.){3}\d{1,3}$|^localhost$|^127\.0\.0\.1$/,
         inputErrorMessage: 'IP 格式不正确'
       }
