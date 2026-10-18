@@ -1,7 +1,7 @@
 import axios from 'axios'
 import ExcelJS from 'exceljs'
 
-const getServerIp = () => localStorage.getItem('server_ip') || '192.168.1.100'
+const getServerIp = () => localStorage.getItem('server_ip') || '172.16.18.20'
 const apiBase = `http://${getServerIp()}:3000/api`
 
 export async function call (channel, payload) {
