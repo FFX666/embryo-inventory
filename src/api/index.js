@@ -1,7 +1,7 @@
 import axios from 'axios'
 import ExcelJS from 'exceljs'
 
-const getServerIp = () => localStorage.getItem('server_ip') || '172.16.18.20'
+const getServerIp = () => localStorage.getItem('server_ip') || '192.168.1.100'
 const apiBase = `http://${getServerIp()}:3000/api`
 
 export async function call (channel, payload) {
@@ -87,44 +87,51 @@ export const api = {
   login: d => call('auth:login', d),
   logout: () => call('auth:logout'),
   changePwd: d => call('auth:changePwd', d),
+
   // 用户
   userList: d => call('user:list', d),
   userSave: d => call('user:save', d),
   userDelete: d => call('user:delete', d),
+
   // 分类
   categoryList: () => call('category:list'),
   categorySave: d => call('category:save', d),
   categoryDelete: d => call('category:delete', d),
+
   // 物料
   itemList: d => call('item:list', d),
   itemOptions: () => call('item:options'),
   itemSave: d => call('item:save', d),
   itemDelete: d => call('item:delete', d),
   itemFindByCode: d => call('item:findByCode', d),
+
+  // 字典 (单位、厂家、供应商等)
+  dictAll: () => call('dict:all'),
+  dictDelete: d => call('dict:delete', d),
+
   // 批次
   batchList: d => call('batch:list', d),
   batchTrace: d => call('batch:trace', d),
   batchScrap: d => call('batch:scrap', d),
   batchDelete: d => call('batch:delete', d),
+
   // 出入库
   stockIn: d => call('stock:in', d),
   stockOut: d => call('stock:out', d),
   stockRecommend: d => call('stock:recommend', d),
   recordList: d => call('record:list', d),
+
   // 报表
   dashboard: () => call('dashboard:stats'),
   reportSummary: d => call('report:summary', d),
   exportExcel: exportExcel, // 指向纯前端方法
+
   // 日志
   logList: d => call('log:list', d),
+
   // 系统
   sysInfo: () => call('system:info'),
   backup: () => call('system:backup'),
   restore: () => call('system:restore'),
   openDataDir: () => call('system:openDataDir')
-    // ...
-  itemFindByCode: d => call('item:findByCode', d),
-  dictAll: () => call('dict:all'),
-  dictDelete: d => call('dict:delete', d),
-  // ...
 }
