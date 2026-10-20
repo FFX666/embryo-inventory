@@ -122,4 +122,9 @@ export const api = {
   backup: () => call('system:backup'),
   restore: () => call('system:restore'),
   openDataDir: () => call('system:openDataDir')
+    // ...
+  itemFindByCode: d => call('item:findByCode', d),
+  dictAll: () => call('dict:all'),
+  dictDelete: d => call('dict:delete', d),
+  // ...
 }
