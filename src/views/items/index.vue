@@ -14,10 +14,6 @@
       <el-select v-model="q.categoryId" placeholder="全部分类" clearable style="width:150px" @change="load(1)">
         <el-option v-for="c in categories" :key="c.id" :label="c.name" :value="c.id" />
       </el-select>
-      <el-select v-model="q.status" placeholder="全部状态" clearable style="width:130px" @change="load(1)">
-        <el-option label="启用" :value="1" />
-        <el-option label="停用" :value="0" />
-      </el-select>
       <el-button type="primary" :icon="Search" @click="load(1)">查询</el-button>
       <el-button :icon="Refresh" @click="reset">重置</el-button>
       <div class="grow"></div>
@@ -31,7 +27,6 @@
         <el-table-column prop="name" label="物料名称" min-width="200" show-overflow-tooltip>
           <template #default="{ row }">
             <span style="font-weight:600">{{ row.name }}</span>
-            <el-tag v-if="row.status === 0" size="small" type="info" style="margin-left:6px">停用</el-tag>
           </template>
         </el-table-column>
         <el-table-column prop="category_name" label="分类" width="100" />
@@ -46,60 +41,99 @@
             <span style="color:#c0c4cc;font-size:12px"> / {{ row.min_stock }}</span>
           </template>
         </el-table-column>
-        <el-table-column prop="warn_days" label="效期预警" width="95" align="center">
-          <template #default="{ row }">{{ row.warn_days }} 天</template>
-        </el-table-column>
-        <el-table-column prop="storage_condition" label="存储条件" width="130" show-overflow-tooltip />
-        <el-table-column label="操作" width="220" fixed="right" align="center">
+        <el-table-column label="操作" width="200" fixed="right" align="center">
           <template #default="{ row }">
             <el-button link type="primary" size="small" @click="openEdit(row)">编辑</el-button>
-            <el-button v-if="store.canWrite" link type="warning" size="small"
-                       @click="remove(row, false)">删除</el-button>
-            <el-button v-if="store.isAdmin" link type="danger" size="small"
-                       @click="remove(row, true)">强制删除</el-button>
+            <el-button v-if="store.canWrite" link type="warning" size="small" @click="remove(row, false)">删除</el-button>
+            <el-button v-if="store.isAdmin" link type="danger" size="small" @click="remove(row, true)">强制删除</el-button>
           </template>
         </el-table-column>
       </el-table>
 
-      <el-pagination
-        style="margin-top:14px;justify-content:flex-end"
+      <el-pagination style="margin-top:14px;justify-content:flex-end"
         background layout="total, sizes, prev, pager, next, jumper"
         :total="total" v-model:current-page="q.page" v-model:page-size="q.pageSize"
         :page-sizes="[10, 20, 50, 100]" @current-change="load()" @size-change="load(1)" />
     </el-card>
 
-    <el-dialog v-model="visible" :title="form.id ? '编辑物料' : '新增物料'" width="720px" destroy-on-close>
+    <!-- 编辑弹窗 -->
+    <el-dialog v-model="visible" :title="form.id ? '编辑物料' : '新增物料'" width="760px" destroy-on-close>
       <el-form ref="formRef" :model="form" :rules="rules" label-width="100px">
         <el-row :gutter="16">
-          <el-col :span="12"><el-form-item label="物料编码" prop="code">
+          <el-col :span="12"><el-form-item label="物料编码">
             <el-input v-model="form.code" placeholder="如 ML-GIVF-100" /></el-form-item></el-col>
           <el-col :span="12"><el-form-item label="条码">
             <el-input v-model="form.barcode" placeholder="扫码枪录入的条码" /></el-form-item></el-col>
+          
           <el-col :span="12"><el-form-item label="物料名称" prop="name">
             <el-input v-model="form.name" placeholder="如 受精培养液 G-IVF Plus" /></el-form-item></el-col>
-          <el-col :span="12"><el-form-item label="分类">
-            <el-select v-model="form.category_id" placeholder="请选择" clearable style="width:100%">
-              <el-option v-for="c in categories" :key="c.id" :label="c.name" :value="c.id" />
-            </el-select></el-form-item></el-col>
+          <el-col :span="12">
+            <el-form-item label="分类">
+              <div style="display:flex; gap: 5px; width: 100%">
+                <el-select v-model="form.category_id" placeholder="请选择分类" clearable style="flex:1">
+                  <el-option v-for="c in categories" :key="c.id" :label="c.name" :value="c.id" />
+                </el-select>
+                <el-button v-if="store.canWrite" :icon="Setting" @click="categoryVisible = true" title="管理分类" />
+              </div>
+            </el-form-item>
+          </el-col>
+
           <el-col :span="12"><el-form-item label="规格">
             <el-input v-model="form.spec" placeholder="如 100mL/瓶" /></el-form-item></el-col>
+          
           <el-col :span="12"><el-form-item label="单位">
-            <el-input v-model="form.unit" placeholder="瓶 / 支 / 个" /></el-form-item></el-col>
+            <el-select v-model="form.unit" filterable allow-create default-first-option placeholder="选择或输入" style="width:100%">
+              <el-option v-for="item in dicts.unit" :key="item.id" :label="item.value" :value="item.value">
+                <div style="display:flex;justify-content:space-between;align-items:center">
+                  <span>{{ item.value }}</span>
+                  <el-icon v-if="store.canWrite" class="del-icon" @click.stop="deleteDict(item.id, 'unit')"><Delete /></el-icon>
+                </div>
+              </el-option>
+            </el-select>
+          </el-form-item></el-col>
+
           <el-col :span="12"><el-form-item label="生产厂家">
-            <el-input v-model="form.manufacturer" /></el-form-item></el-col>
+            <el-select v-model="form.manufacturer" filterable allow-create default-first-option placeholder="选择或输入" style="width:100%">
+              <el-option v-for="item in dicts.manufacturer" :key="item.id" :label="item.value" :value="item.value">
+                <div style="display:flex;justify-content:space-between;align-items:center">
+                  <span>{{ item.value }}</span>
+                  <el-icon v-if="store.canWrite" class="del-icon" @click.stop="deleteDict(item.id, 'manufacturer')"><Delete /></el-icon>
+                </div>
+              </el-option>
+            </el-select>
+          </el-form-item></el-col>
           <el-col :span="12"><el-form-item label="供应商">
-            <el-input v-model="form.supplier" /></el-form-item></el-col>
+            <el-select v-model="form.supplier" filterable allow-create default-first-option placeholder="选择或输入" style="width:100%">
+              <el-option v-for="item in dicts.supplier" :key="item.id" :label="item.value" :value="item.value">
+                <div style="display:flex;justify-content:space-between;align-items:center">
+                  <span>{{ item.value }}</span>
+                  <el-icon v-if="store.canWrite" class="del-icon" @click.stop="deleteDict(item.id, 'supplier')"><Delete /></el-icon>
+                </div>
+              </el-option>
+            </el-select>
+          </el-form-item></el-col>
+
           <el-col :span="12"><el-form-item label="最低库存">
-            <el-input-number v-model="form.min_stock" :min="0" :precision="0" style="width:100%" /></el-form-item></el-col>
-          <el-col :span="12"><el-form-item label="效期预警天数">
-            <el-input-number v-model="form.warn_days" :min="1" :max="730" style="width:100%" /></el-form-item></el-col>
+            <el-input-number v-model="form.min_stock" :min="0" style="width:100%" /></el-form-item></el-col>
+          <el-col :span="12"><el-form-item label="效期预警(天)">
+            <el-input-number v-model="form.warn_days" :min="1" style="width:100%" /></el-form-item></el-col>
+          
           <el-col :span="12"><el-form-item label="存储条件">
-            <el-input v-model="form.storage_condition" placeholder="如 2~8℃ 避光" /></el-form-item></el-col>
+            <el-select v-model="form.storage_condition" filterable allow-create default-first-option placeholder="选择或输入" style="width:100%">
+              <el-option v-for="item in dicts.storage_condition" :key="item.id" :label="item.value" :value="item.value">
+                <div style="display:flex;justify-content:space-between;align-items:center">
+                  <span>{{ item.value }}</span>
+                  <el-icon v-if="store.canWrite" class="del-icon" @click.stop="deleteDict(item.id, 'storage_condition')"><Delete /></el-icon>
+                </div>
+              </el-option>
+            </el-select>
+          </el-form-item></el-col>
           <el-col :span="12"><el-form-item label="状态">
             <el-radio-group v-model="form.status">
               <el-radio :value="1">启用</el-radio>
               <el-radio :value="0">停用</el-radio>
             </el-radio-group></el-form-item></el-col>
+          
           <el-col :span="24"><el-form-item label="备注">
             <el-input v-model="form.remark" type="textarea" :rows="2" /></el-form-item></el-col>
         </el-row>
@@ -109,13 +143,29 @@
         <el-button type="primary" :loading="saving" @click="submit">保存</el-button>
       </template>
     </el-dialog>
+
+    <!-- 分类管理弹窗 -->
+    <el-dialog v-model="categoryVisible" title="分类管理" width="400px" append-to-body>
+      <div style="display:flex; gap:10px; margin-bottom:15px">
+        <el-input v-model="newCategoryName" placeholder="输入新分类名称" @keyup.enter="addCategory" />
+        <el-button type="primary" @click="addCategory">添加</el-button>
+      </div>
+      <el-table :data="categories" size="small" border max-height="300">
+        <el-table-column prop="name" label="分类名称" />
+        <el-table-column label="操作" width="80" align="center">
+          <template #default="{ row }">
+            <el-button link type="danger" :icon="Delete" @click="deleteCategory(row)" />
+          </template>
+        </el-table-column>
+      </el-table>
+    </el-dialog>
   </div>
 </template>
 
 <script setup>
 import { onMounted, reactive, ref } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { Plus, Search, Refresh, Download } from '@element-plus/icons-vue'
+import { Plus, Search, Refresh, Download, Delete, Setting } from '@element-plus/icons-vue'
 import { api } from '@/api'
 import { useUserStore } from '@/store/user'
 
@@ -124,16 +174,61 @@ const loading = ref(false), saving = ref(false)
 const rows = ref([]), total = ref(0), categories = ref([])
 const visible = ref(false), formRef = ref()
 
-const q = reactive({ keyword: '', categoryId: null, status: '', page: 1, pageSize: 10 })
+const dicts = reactive({ unit: [], manufacturer: [], supplier: [], storage_condition: [] })
+const categoryVisible = ref(false)
+const newCategoryName = ref('')
+
+const q = reactive({ keyword: '', categoryId: null, page: 1, pageSize: 10 })
 const EMPTY = {
   id: null, code: '', barcode: '', name: '', category_id: null, spec: '', unit: '瓶',
   manufacturer: '', supplier: '', min_stock: 0, warn_days: 30,
   storage_condition: '', remark: '', status: 1
 }
 const form = reactive({ ...EMPTY })
-const rules = {
-  name: [{ required: true, message: '请输入物料名称', trigger: 'blur' }],
-  unit: [{ required: true, message: '请输入单位', trigger: 'blur' }]
+const rules = { name: [{ required: true, message: '请输入物料名称', trigger: 'blur' }] }
+
+async function loadDicts() {
+  try {
+    const all = await api.dictAll()
+    dicts.unit = all.filter(x => x.type === 'unit')
+    dicts.manufacturer = all.filter(x => x.type === 'manufacturer')
+    dicts.supplier = all.filter(x => x.type === 'supplier')
+    dicts.storage_condition = all.filter(x => x.type === 'storage_condition')
+  } catch (e) { console.error('获取字典失败', e) }
+}
+
+async function deleteDict(id, type) {
+  try {
+    await ElMessageBox.confirm('确定要删除这个下拉选项吗？', '提示', { type: 'warning' })
+    await api.dictDelete({ id })
+    ElMessage.success('已删除')
+    await loadDicts()
+  } catch (e) {}
+}
+
+async function loadCategories() {
+  categories.value = await api.categoryList()
+}
+
+async function addCategory() {
+  if (!newCategoryName.value.trim()) return
+  try {
+    await api.categorySave({ name: newCategoryName.value.trim() })
+    newCategoryName.value = ''
+    await loadCategories()
+    ElMessage.success('分类已添加')
+  } catch (e) { ElMessage.error(e.message) }
+}
+
+async function deleteCategory(row) {
+  try {
+    await ElMessageBox.confirm(`确定删除分类「${row.name}」吗？`, '提示', { type: 'warning' })
+    await api.categoryDelete({ id: row.id })
+    await loadCategories()
+    ElMessage.success('已删除')
+  } catch (e) {
+    if (e.message && e.message !== 'cancel') ElMessage.error(e.message)
+  }
 }
 
 async function load (resetPage) {
@@ -148,7 +243,7 @@ async function load (resetPage) {
 }
 
 function reset () {
-  Object.assign(q, { keyword: '', categoryId: null, status: '', page: 1 })
+  Object.assign(q, { keyword: '', categoryId: null, page: 1 })
   load()
 }
 
@@ -159,55 +254,35 @@ function openEdit (row) {
 
 async function submit () {
   await formRef.value.validate()
+  
+  // 👇 关键防错：清除扫码枪可能带来的多余空格和回车
+  if (form.barcode) form.barcode = String(form.barcode).trim()
+  if (form.code) form.code = String(form.code).trim()
+  
   saving.value = true
   try {
     await api.itemSave({ ...form })
     ElMessage.success('保存成功')
     visible.value = false
     load()
+    loadDicts()
   } catch (e) { ElMessage.error(e.message) }
   finally { saving.value = false }
 }
 
-/** 删除：force=false 普通删除；force=true 强制删除（仅管理员） */
 async function remove (row, force) {
   if (force) {
-    // 强制删除：二级确认
     try {
-      await ElMessageBox.confirm(
-        `即将强制删除物料「${row.name}」。\n\n此操作会同时删除该物料的所有批次（${row.current_stock} ${row.unit}）和全部出入库流水，且不可恢复！\n\n确定要继续吗？`,
-        '危险操作确认',
-        {
-          type: 'error',
-          confirmButtonText: '确认强制删除',
-          confirmButtonClass: 'el-button--danger',
-          cancelButtonText: '取消'
-        }
-      )
-    } catch (e) { return }
-
-    // 再确认一次，避免误操作
-    try {
-      await ElMessageBox.prompt(
-        `请输入物料名称「${row.name}」以确认删除：`,
-        '二次确认',
-        {
-          type: 'warning',
-          confirmButtonText: '彻底删除',
-          confirmButtonClass: 'el-button--danger',
-          inputValidator: (v) => v === row.name || '输入的物料名称不正确'
-        }
-      )
+      await ElMessageBox.confirm(`即将强制删除物料「${row.name}」。\n\n此操作会同时删除所有批次和流水，且不可恢复！`, '危险操作确认', { type: 'error', confirmButtonText: '确认删除' })
     } catch (e) { return }
   } else {
     try {
       await ElMessageBox.confirm(`确定删除物料「${row.name}」吗？`, '删除确认', { type: 'warning' })
     } catch (e) { return }
   }
-
   try {
     await api.itemDelete({ id: row.id, force })
-    ElMessage.success(force ? '物料及其全部批次已强制删除' : '已删除')
+    ElMessage.success('已删除')
     load()
   } catch (e) { ElMessage.error(e.message) }
 }
@@ -219,27 +294,27 @@ async function exportList () {
       sheets: [{
         name: '物料档案',
         columns: [
-          { header: '物料编码', key: 'code', width: 16 },
-          { header: '物料名称', key: 'name', width: 30 },
-          { header: '分类', key: 'category_name', width: 12 },
-          { header: '规格', key: 'spec', width: 16 },
-          { header: '单位', key: 'unit', width: 8 },
-          { header: '生产厂家', key: 'manufacturer', width: 18 },
-          { header: '供应商', key: 'supplier', width: 18 },
-          { header: '当前库存', key: 'current_stock', width: 12 },
-          { header: '最低库存', key: 'min_stock', width: 12 },
-          { header: '存储条件', key: 'storage_condition', width: 18 },
-          { header: '状态', key: 'statusText', width: 10 }
+          { header: '物料编码', key: 'code', width: 16 }, { header: '物料名称', key: 'name', width: 30 },
+          { header: '分类', key: 'category_name', width: 12 }, { header: '规格', key: 'spec', width: 16 },
+          { header: '单位', key: 'unit', width: 8 }, { header: '生产厂家', key: 'manufacturer', width: 18 },
+          { header: '供应商', key: 'supplier', width: 18 }, { header: '当前库存', key: 'current_stock', width: 12 },
+          { header: '最低库存', key: 'min_stock', width: 12 }, { header: '存储条件', key: 'storage_condition', width: 18 }
         ],
-        rows: rows.value.map(r => ({ ...r, statusText: r.status === 1 ? '启用' : '停用' }))
+        rows: rows.value
       }]
     })
-    if (!res.cancelled) ElMessage.success('导出成功：' + res.path)
+    if (!res.cancelled) ElMessage.success('导出成功')
   } catch (e) { ElMessage.error(e.message) }
 }
 
 onMounted(async () => {
-  categories.value = await api.categoryList()
+  await loadCategories()
+  await loadDicts()
   load()
 })
 </script>
+
+<style scoped>
+.del-icon { color: #f56c6c; cursor: pointer; font-size: 14px; }
+.del-icon:hover { background: #fef0f0; border-radius: 50%; }
+</style>
