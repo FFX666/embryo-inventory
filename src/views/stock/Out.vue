@@ -10,10 +10,37 @@
     <el-row :gutter="16">
       <el-col :span="10">
         <el-card shadow="never">
-          <template #header><span style="font-weight:600">出库单</span></template>
+          <template #header>
+            <div style="display:flex; justify-content:space-between; align-items:center">
+              <span style="font-weight:600">出库单</span>
+              <el-tag v-if="scannedItem" type="success" effect="light" size="small">
+                已识别：{{ scannedItem.name }}
+              </el-tag>
+            </div>
+          </template>
+
+          <!-- 扫码输入区域 -->
+          <div style="margin-bottom: 18px; display:flex; gap:10px; align-items:center">
+            <el-input
+              ref="scanRef"
+              v-model="scanCode"
+              class="scan-input"
+              size="large"
+              clearable
+              placeholder="请扫描条码或输入编码后按回车"
+              style="flex: 1"
+              @keyup.enter="handleScan"
+            >
+              <template #prefix>
+                <el-icon><Aim /></el-icon>
+              </template>
+            </el-input>
+            <el-button type="primary" size="large" :icon="Search" @click="handleScan">查询</el-button>
+          </div>
+
           <el-form ref="formRef" :model="form" :rules="rules" label-width="92px">
             <el-form-item label="物料" prop="itemId">
-              <el-select v-model="form.itemId" filterable placeholder="请选择物料" style="width:100%"
+              <el-select v-model="form.itemId" filterable placeholder="请选择物料（或上方扫码）" style="width:100%"
                          @change="onItemChange">
                 <el-option v-for="i in items" :key="i.id" :value="i.id"
                            :label="`${i.name} ${i.spec ? '· ' + i.spec : ''}`">
@@ -143,9 +170,9 @@
 </template>
 
 <script setup>
-import { computed, onMounted, reactive, ref, watch } from 'vue'
+import { computed, nextTick, onMounted, reactive, ref, watch } from 'vue'
 import { ElMessage } from 'element-plus'
-import { Check, Star } from '@element-plus/icons-vue'
+import { Check, Star, Aim, Search } from '@element-plus/icons-vue'
 import { api } from '@/api'
 
 const items = ref([])
@@ -154,6 +181,11 @@ const loadingBatch = ref(false)
 const saving = ref(false)
 const formRef = ref()
 const lastResult = ref(null)
+
+// 扫码相关
+const scanCode = ref('')
+const scanRef = ref()
+const scannedItem = ref(null)
 
 const form = reactive({
   itemId: null, quantity: 1, batchId: null, mode: 'auto',
@@ -170,6 +202,26 @@ const totalStock = computed(() =>
   batches.value.reduce((s, b) => s + (b.remaining || 0), 0))
 
 const rowClass = ({ row }) => (form.mode === 'auto' && row.recommended ? 'row-recommend' : '')
+
+/** 扫码查询 */
+async function handleScan () {
+  const code = scanCode.value.trim()
+  if (!code) return
+  try {
+    const item = await api.itemFindByCode({ code })
+    if (item) {
+      form.itemId = item.id
+      scannedItem.value = item
+      ElMessage.success(`已识别物料：${item.name}`)
+      onItemChange()
+      scanCode.value = ''
+      nextTick(() => scanRef.value?.focus())
+    } else {
+      scannedItem.value = null
+      ElMessage.warning('未匹配到物料，请先在「物料档案」中登记该条码')
+    }
+  } catch (e) { ElMessage.error(e.message) }
+}
 
 async function onItemChange () {
   form.batchId = null
@@ -228,7 +280,22 @@ function resetForm () {
   Object.assign(form, { itemId: null, quantity: 1, batchId: null, mode: 'auto', handler: '', purpose: '', remark: '' })
   batches.value = []
   lastResult.value = null
+  scanCode.value = ''
+  scannedItem.value = null
+  nextTick(() => scanRef.value?.focus())
 }
 
-onMounted(async () => { items.value = await api.itemOptions() })
+onMounted(async () => {
+  items.value = await api.itemOptions()
+  nextTick(() => scanRef.value?.focus())
+})
 </script>
+
+<style scoped>
+.scan-input :deep(.el-input__wrapper) {
+  box-shadow: 0 0 0 1px #dcdfe6 inset;
+}
+.scan-input :deep(.el-input__wrapper.is-focus) {
+  box-shadow: 0 0 0 2px #4a8cff inset !important;
+}
+</style>
