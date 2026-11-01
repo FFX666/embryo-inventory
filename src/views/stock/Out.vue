@@ -19,31 +19,19 @@
             </div>
           </template>
 
-          <!-- 扫码输入区域 -->
           <div style="margin-bottom: 18px; display:flex; gap:10px; align-items:center">
             <el-input
-              ref="scanRef"
-              v-model="scanCode"
-              class="scan-input"
-              size="large"
-              clearable
-              placeholder="请扫描条码或输入编码后按回车"
-              style="flex: 1"
-              @keyup.enter="handleScan"
-            >
-              <template #prefix>
-                <el-icon><Aim /></el-icon>
-              </template>
+              ref="scanRef" v-model="scanCode" class="scan-input" size="large" clearable
+              placeholder="请扫描条码或输入编码后按回车" style="flex: 1" @keyup.enter="handleScan">
+              <template #prefix><el-icon><Aim /></el-icon></template>
             </el-input>
             <el-button type="primary" size="large" :icon="Search" @click="handleScan">查询</el-button>
           </div>
 
           <el-form ref="formRef" :model="form" :rules="rules" label-width="92px">
             <el-form-item label="物料" prop="itemId">
-              <el-select v-model="form.itemId" filterable placeholder="请选择物料（或上方扫码）" style="width:100%"
-                         @change="onItemChange">
-                <el-option v-for="i in items" :key="i.id" :value="i.id"
-                           :label="`${i.name} ${i.spec ? '· ' + i.spec : ''}`">
+              <el-select v-model="form.itemId" filterable placeholder="请选择物料（或上方扫码）" style="width:100%" @change="onItemChange">
+                <el-option v-for="i in items" :key="i.id" :value="i.id" :label="`${i.name} ${i.spec ? '· ' + i.spec : ''}`">
                   <span style="float:left">{{ i.name }}</span>
                   <span style="float:right;color:#97a3b5;font-size:12px">{{ i.unit }}</span>
                 </el-option>
@@ -51,8 +39,7 @@
             </el-form-item>
 
             <el-form-item label="出库数量" prop="quantity">
-              <el-input-number v-model="form.quantity" :min="0.01" :precision="2"
-                               style="width:100%" @change="refreshRecommend" />
+              <el-input-number v-model="form.quantity" :min="0.01" :precision="2" style="width:100%" @change="refreshRecommend" />
             </el-form-item>
 
             <el-form-item label="出库方式">
@@ -102,23 +89,15 @@
               <el-tag v-if="form.mode === 'auto'" type="success" effect="light" size="small">
                 系统已按先到期先出排好顺序
               </el-tag>
-              <el-tag v-else type="warning" effect="light" size="small">请手动点击选择批次</el-tag>
+              <el-tag v-else type="warning" effect="light" size="small">请点击下方按钮选择批次</el-tag>
             </div>
           </template>
 
-          <el-table
-            :data="batches" v-loading="loadingBatch" border size="small"
-            :row-class-name="rowClass"
-            highlight-current-row empty-text="该物料暂无可用批次"
-            @current-change="onRowSelect">
-
+          <el-table :data="batches" v-loading="loadingBatch" border size="small" :row-class-name="rowClass" empty-text="该物料暂无可用批次">
             <el-table-column width="70" align="center">
               <template #default="{ row }">
-                <el-radio v-if="form.mode === 'manual'" :model-value="form.batchId"
-                          :value="row.id" @change="() => form.batchId = row.id">
-                  <span></span>
-                </el-radio>
-                <el-icon v-else-if="row.recommended" style="color:#4a8cff;font-size:16px"><Star /></el-icon>
+                <el-icon v-if="form.mode === 'auto' && row.recommended" style="color:#4a8cff;font-size:16px"><Star /></el-icon>
+                <el-icon v-else-if="form.mode === 'manual' && form.batchId === row.id" style="color:#67c23a;font-size:16px"><CircleCheck /></el-icon>
               </template>
             </el-table-column>
             <el-table-column prop="batch_no" label="批号" width="120" />
@@ -128,17 +107,22 @@
             </el-table-column>
             <el-table-column label="效期" width="110" align="center">
               <template #default="{ row }">
-                <el-tag size="small" :type="row.expired ? 'danger' : row.days_left <= 30 ? 'warning' : 'success'"
-                        effect="light">
+                <el-tag size="small" :type="row.expired ? 'danger' : row.days_left <= 30 ? 'warning' : 'success'" effect="light">
                   {{ row.expired ? `已过期${-row.days_left}天` : `剩${row.days_left}天` }}
                 </el-tag>
               </template>
             </el-table-column>
             <el-table-column prop="location" label="存放位置" min-width="130" show-overflow-tooltip />
-            <el-table-column label="建议出库" width="100" align="center">
+            
+            <!-- 👇 新增：直接选择按钮 -->
+            <el-table-column label="操作" width="100" align="center">
               <template #default="{ row }">
-                <span v-if="row.suggestQty > 0" style="color:#4a8cff;font-weight:700">{{ row.suggestQty }}</span>
-                <span v-else style="color:#c0c4cc">—</span>
+                <el-button 
+                  v-if="form.mode === 'manual' && form.batchId !== row.id" 
+                  type="primary" link size="small" @click="selectSpecificBatch(row)">
+                  选此批次
+                </el-button>
+                <el-tag v-if="form.mode === 'manual' && form.batchId === row.id" type="success" size="small">已选中</el-tag>
               </template>
             </el-table-column>
           </el-table>
@@ -172,7 +156,7 @@
 <script setup>
 import { computed, nextTick, onMounted, reactive, ref, watch } from 'vue'
 import { ElMessage } from 'element-plus'
-import { Check, Star, Aim, Search } from '@element-plus/icons-vue'
+import { Check, Star, Aim, Search, CircleCheck } from '@element-plus/icons-vue'
 import { api } from '@/api'
 
 const items = ref([])
@@ -182,7 +166,6 @@ const saving = ref(false)
 const formRef = ref()
 const lastResult = ref(null)
 
-// 扫码相关
 const scanCode = ref('')
 const scanRef = ref()
 const scannedItem = ref(null)
@@ -201,9 +184,12 @@ const currentItem = computed(() => items.value.find(i => i.id === form.itemId))
 const totalStock = computed(() =>
   batches.value.reduce((s, b) => s + (b.remaining || 0), 0))
 
-const rowClass = ({ row }) => (form.mode === 'auto' && row.recommended ? 'row-recommend' : '')
+const rowClass = ({ row }) => {
+  if (form.mode === 'auto' && row.recommended) return 'row-recommend'
+  if (form.mode === 'manual' && form.batchId === row.id) return 'row-selected'
+  return ''
+}
 
-/** 扫码查询 */
 async function handleScan () {
   const code = scanCode.value.trim()
   if (!code) return
@@ -236,26 +222,24 @@ async function refreshRecommend () {
       itemId: form.itemId,
       quantity: form.mode === 'auto' ? form.quantity : 0
     })
-    if (form.mode === 'manual' && batches.value.length && !form.batchId) {
-      form.batchId = batches.value[0].id
-    }
   } catch (e) { ElMessage.error(e.message) }
   finally { loadingBatch.value = false }
 }
 
 watch(() => form.mode, (m) => {
   if (m === 'auto') form.batchId = null
-  else if (batches.value.length) form.batchId = batches.value[0].id
   refreshRecommend()
 })
 
-function onRowSelect (row) {
-  if (form.mode === 'manual' && row) form.batchId = row.id
+// 直接点击列表按钮选中批次
+function selectSpecificBatch(row) {
+  form.mode = 'manual'
+  form.batchId = row.id
 }
 
 async function submit () {
   await formRef.value.validate()
-  if (form.mode === 'manual' && !form.batchId) return ElMessage.warning('请选择要出库的批次')
+  if (form.mode === 'manual' && !form.batchId) return ElMessage.warning('请点击右侧列表选择要出库的批次')
   if (form.quantity > totalStock.value) return ElMessage.warning('出库数量超过可用库存')
 
   saving.value = true
@@ -292,10 +276,9 @@ onMounted(async () => {
 </script>
 
 <style scoped>
-.scan-input :deep(.el-input__wrapper) {
-  box-shadow: 0 0 0 1px #dcdfe6 inset;
-}
-.scan-input :deep(.el-input__wrapper.is-focus) {
-  box-shadow: 0 0 0 2px #4a8cff inset !important;
-}
+.scan-input :deep(.el-input__wrapper) { box-shadow: 0 0 0 1px #dcdfe6 inset; }
+.scan-input :deep(.el-input__wrapper.is-focus) { box-shadow: 0 0 0 2px #4a8cff inset !important; }
+
+:deep(.row-recommend) { background: #f0f9ff !important; }
+:deep(.row-selected) { background: #f0f9eb !important; }
 </style>
