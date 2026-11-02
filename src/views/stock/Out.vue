@@ -94,18 +94,26 @@
           </template>
 
           <el-table :data="batches" v-loading="loadingBatch" border size="small" :row-class-name="rowClass" empty-text="该物料暂无可用批次">
-            <el-table-column width="60" align="center">
+            
+            <!-- 👇 调整：将操作列移到最左侧，合并图标和按钮 -->
+            <el-table-column label="操作" width="130" align="center">
               <template #default="{ row }">
-                <el-icon v-if="form.mode === 'auto' && row.recommended" style="color:#4a8cff;font-size:16px"><Star /></el-icon>
-                <el-icon v-else-if="form.mode === 'manual' && form.batchId === row.id" style="color:#67c23a;font-size:16px"><CircleCheck /></el-icon>
+                <!-- 如果已选中，显示绿色标签 -->
+                <el-tag v-if="form.batchId === row.id" type="success" size="small">已选中</el-tag>
+                <!-- 如果未选中，显示按钮和推荐星标 -->
+                <div v-else style="display:flex; justify-content:center; align-items:center; gap:4px;">
+                  <el-icon v-if="form.mode === 'auto' && row.recommended" style="color:#4a8cff;font-size:16px;" title="推荐优先出库"><Star /></el-icon>
+                  <el-button type="primary" plain size="small" @click="selectSpecificBatch(row)">选此批次</el-button>
+                </div>
               </template>
             </el-table-column>
-            <el-table-column prop="batch_no" label="批号" width="110" />
-            <el-table-column prop="remaining" label="剩余" width="75" align="center" />
-            <el-table-column prop="expire_date" label="有效期至" width="110" align="center">
+
+            <el-table-column prop="batch_no" label="批号" width="120" />
+            <el-table-column prop="remaining" label="剩余" width="80" align="center" />
+            <el-table-column prop="expire_date" label="有效期至" width="115" align="center">
               <template #default="{ row }">{{ row.expire_date || '—' }}</template>
             </el-table-column>
-            <el-table-column label="效期" width="105" align="center">
+            <el-table-column label="效期" width="110" align="center">
               <template #default="{ row }">
                 <el-tag size="small" :type="row.expired ? 'danger' : row.days_left <= 30 ? 'warning' : 'success'" effect="light">
                   {{ row.expired ? `已过期${-row.days_left}天` : `剩${row.days_left}天` }}
@@ -114,17 +122,6 @@
             </el-table-column>
             <el-table-column prop="location" label="存放位置" min-width="120" show-overflow-tooltip />
             
-            <!-- 👇 新增的“操作”列，固定在最右侧 -->
-            <el-table-column label="操作" width="110" align="center" fixed="right">
-              <template #default="{ row }">
-                <el-button 
-                  v-if="form.batchId !== row.id" 
-                  type="primary" plain size="small" @click="selectSpecificBatch(row)">
-                  选此批次
-                </el-button>
-                <el-tag v-if="form.batchId === row.id" type="success" size="small">已选中</el-tag>
-              </template>
-            </el-table-column>
           </el-table>
         </el-card>
 
@@ -156,7 +153,7 @@
 <script setup>
 import { computed, nextTick, onMounted, reactive, ref, watch } from 'vue'
 import { ElMessage } from 'element-plus'
-import { Check, Star, Aim, Search, CircleCheck } from '@element-plus/icons-vue'
+import { Check, Star, Aim, Search } from '@element-plus/icons-vue'
 import { api } from '@/api'
 
 const items = ref([])
@@ -231,7 +228,7 @@ watch(() => form.mode, (m) => {
   refreshRecommend()
 })
 
-// 👇 无论左侧是什么模式，点击右侧按钮直接切换并选中
+// 无论左侧是什么模式，点击右侧按钮直接切换并选中
 function selectSpecificBatch(row) {
   form.mode = 'manual'
   form.batchId = row.id
